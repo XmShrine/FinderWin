@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/FinderWin.ico</ApplicationIcon>
+    <!-- Keep stale/interrupted build caches out of the SDK's source glob. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets/MacFolder.png" />
+    <Resource Include="Assets/FolderFilled.png" />
+    <Resource Include="Assets/FolderEmpty.png" />
+    <Resource Include="Assets/Zip.png" />
+    <Resource Include="Assets/GenericFile.png" />
+    <Resource Include="Assets/FinderWin.ico" />
+    <Resource Include="Assets/Fonts/SourceHanSansSC-Normal.otf" />
+    <Resource Include="Assets/Fonts/SourceHanSansSC-Medium.otf" />
+    <Content Include="Assets/Fonts/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

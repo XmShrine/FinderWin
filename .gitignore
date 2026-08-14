@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+publish/
+artifacts/
+
+# IDE and user state
+.vs/
+.vscode/
+*.user
+*.suo
+
+# macOS metadata and diagnostics
+.DS_Store
+FinderWin-startup.log
+
+# Local packages
+*.nupkg
