@@ -1,4 +1,10 @@
-# FinderWin
+<p align="center">
+  <img src="Assets/Finder-reference.png" width="160" alt="FinderWin 图标">
+</p>
+
+<h1 align="center">FinderWin</h1>
+
+<p align="center">在 Windows 上提供接近 macOS Finder 的原生文件管理体验。</p>
 
 FinderWin 是一个面向 Windows 10/11 的原生 WPF 文件管理器，界面与交互参考 macOS Finder。项目不使用 Electron、WebView 或 Node.js 运行时。
 
