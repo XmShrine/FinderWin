@@ -40,6 +40,10 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
     private System.Windows.Point _canvasDragPointer;
     private bool _canvasDragging;
     private readonly List<string> _clipboardPaths = [];
+    private FileItem? _renamingItem;
+    private System.Windows.Controls.Primitives.Popup? _renamePopup;
+    private System.Windows.Controls.TextBox? _renameEditor;
+    private bool _finishingRename;
     private readonly Dictionary<string, TagRecord> _tags;
     private static readonly (string Name, string Color)[] TagPalette = [("红色", "#FF5B57"), ("橙色", "#FF9F0A"), ("黄色", "#FFD60A"), ("绿色", "#30D158"), ("蓝色", "#0A84FF"), ("紫色", "#BF5AF2"), ("灰色", "#8E8E93")];
     private string? _activeTagFilter;
@@ -219,9 +223,9 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
         }
         catch (Exception error) { App.WriteLog($"Could not read icon positions from {folder}", error); return new(StringComparer.OrdinalIgnoreCase); }
     }
-    private bool SaveIconPositions() {
+    private bool SaveIconPositions(string? renamedFrom = null, string? renamedTo = null) {
         if (string.IsNullOrEmpty(CurrentPath) || IsInsideMacArchiveMetadata(CurrentPath)) return false;
-        var state = JsonSerializer.Serialize(new FinderState(_files.ToDictionary(item => item.Name, item => new IconPosition(item.CanvasX, item.CanvasY), StringComparer.OrdinalIgnoreCase)));
+        var state = JsonSerializer.Serialize(new FinderState(_files.ToDictionary(item => string.Equals(item.Name, renamedFrom, StringComparison.OrdinalIgnoreCase) ? renamedTo! : item.Name, item => new IconPosition(item.CanvasX, item.CanvasY), StringComparer.OrdinalIgnoreCase)));
         var savedToDatabase = false;
         try {
             var layoutFile = LayoutFileFor(CurrentPath);
@@ -329,6 +333,7 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
     private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e) {
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Windows) && Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) && e.Key == Key.OemPeriod) { ToggleHidden(); e.Handled = true; }
         else if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control) && e.Key == Key.F) { ExpandSearch(); e.Handled = true; }
+        else if ((e.Key == Key.Enter || e.Key == Key.F2) && Keyboard.Modifiers == ModifierKeys.None && Keyboard.FocusedElement is not System.Windows.Controls.TextBox && ActiveItem is FileItem item) { BeginRename(item); e.Handled = true; }
     }
     private async void Back_Click(object sender, System.Windows.RoutedEventArgs e) { if (_historyIndex > 0) { _historyIndex--; await NavigateAsync(_history[_historyIndex], false); } }
     private async void Forward_Click(object sender, System.Windows.RoutedEventArgs e) { if (_historyIndex < _history.Count - 1) { _historyIndex++; await NavigateAsync(_history[_historyIndex], false); } }
@@ -401,7 +406,65 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
     private async void NewFolder_Click(object sender, System.Windows.RoutedEventArgs e) { var name = Microsoft.VisualBasic.Interaction.InputBox("新建文件夹名称：", "新建文件夹", "未命名文件夹"); if (!string.IsNullOrWhiteSpace(name)) { try { Directory.CreateDirectory(Path.Combine(CurrentPath, name)); } catch (Exception error) { StatusText.Text = error.Message; } await NavigateAsync(CurrentPath, false); } }
     private async void Refresh_Click(object sender, System.Windows.RoutedEventArgs e) => await NavigateAsync(CurrentPath, false);
     private void ToggleHidden_Click(object sender, System.Windows.RoutedEventArgs e) => ToggleHidden();
-    private async void Rename_Click(object sender, System.Windows.RoutedEventArgs e) { if (ActiveItem is not FileItem item) return; var name = Microsoft.VisualBasic.Interaction.InputBox("重命名：", "重命名", item.Name); if (!string.IsNullOrWhiteSpace(name) && name != item.Name && !name.Contains(Path.DirectorySeparatorChar) && !name.Contains(Path.AltDirectorySeparatorChar)) { try { if (item.IsDirectory) Directory.Move(item.FullPath, Path.Combine(CurrentPath, name)); else File.Move(item.FullPath, Path.Combine(CurrentPath, name)); } catch (Exception error) { StatusText.Text = error.Message; } await NavigateAsync(CurrentPath, false); } }
+    private void Rename_Click(object sender, System.Windows.RoutedEventArgs e) { if (ActiveItem is FileItem item) BeginRename(item); }
+    private void BeginRename(FileItem item) {
+        if (_renamingItem is not null) CancelRename();
+        _renamingItem = item; item.RenameText = item.Name; item.IsRenaming = true;
+        Dispatcher.BeginInvoke(() => {
+            var list = _iconView ? IconList : FileList;
+            if (list.ItemContainerGenerator.ContainerFromItem(item) is not System.Windows.Controls.ListBoxItem container) return;
+            var editor = FindVisualChild<System.Windows.Controls.TextBox>(container, "RenameEditor");
+            if (editor is null) editor = CreateIconRenameEditor(container, item);
+            _renameEditor = editor; editor.Focus(); Keyboard.Focus(editor); SelectRenameStem(editor, item);
+        }, DispatcherPriority.Input);
+    }
+    private System.Windows.Controls.TextBox CreateIconRenameEditor(System.Windows.Controls.ListBoxItem container, FileItem item) {
+        var width = Math.Clamp(item.Name.Length * 8d + 14, 72, 150);
+        var editor = new System.Windows.Controls.TextBox { Style = (Style)FindResource("InlineRenameEditor"), DataContext = item, Text = item.RenameText, Width = width, Height = 24, FontSize = 12, TextAlignment = TextAlignment.Center, Visibility = Visibility.Visible };
+        editor.TextChanged += (_, _) => item.RenameText = editor.Text;
+        editor.KeyDown += RenameEditor_KeyDown; editor.LostKeyboardFocus += RenameEditor_LostKeyboardFocus;
+        _renamePopup = new System.Windows.Controls.Primitives.Popup { PlacementTarget = container, Placement = System.Windows.Controls.Primitives.PlacementMode.Relative, HorizontalOffset = (container.ActualWidth - width) / 2, VerticalOffset = 105, StaysOpen = true, AllowsTransparency = true, Child = editor, IsOpen = true };
+        return editor;
+    }
+    private static T? FindVisualChild<T>(DependencyObject parent, string name) where T : FrameworkElement {
+        for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); index++) {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, index);
+            if (child is T match && match.Name == name) return match;
+            var nested = FindVisualChild<T>(child, name); if (nested is not null) return nested;
+        }
+        return null;
+    }
+    private static void SelectRenameStem(System.Windows.Controls.TextBox editor, FileItem item) {
+        var extensionLength = item.IsDirectory ? 0 : Path.GetExtension(item.Name).Length;
+        editor.Select(0, Math.Max(0, item.Name.Length - extensionLength));
+    }
+    private async void RenameEditor_KeyDown(object sender, System.Windows.Input.KeyEventArgs e) {
+        if (e.Key == Key.Escape) { CancelRename(); e.Handled = true; }
+        else if (e.Key == Key.Enter) { e.Handled = true; await CommitRenameAsync(); }
+    }
+    private async void RenameEditor_LostKeyboardFocus(object sender, System.Windows.Input.KeyboardFocusChangedEventArgs e) {
+        if (_renamingItem is not null && !_finishingRename) await CommitRenameAsync();
+    }
+    private void CancelRename() {
+        if (_renamingItem is not null) { _renamingItem.RenameText = _renamingItem.Name; _renamingItem.IsRenaming = false; }
+        _renamePopup?.SetCurrentValue(System.Windows.Controls.Primitives.Popup.IsOpenProperty, false); _renamePopup = null; _renameEditor = null; _renamingItem = null;
+    }
+    private async Task CommitRenameAsync() {
+        if (_renamingItem is not FileItem item || _finishingRename) return;
+        var newName = item.RenameText.Trim();
+        if (newName == item.Name) { CancelRename(); return; }
+        if (string.IsNullOrWhiteSpace(newName) || newName is "." or ".." || newName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) { StatusText.Text = "文件名不能包含无效字符"; _renameEditor?.Focus(); return; }
+        var target = Path.Combine(CurrentPath, newName);
+        if (File.Exists(target) || Directory.Exists(target)) { StatusText.Text = $"“{newName}”已经存在"; _renameEditor?.Focus(); return; }
+        _finishingRename = true;
+        try {
+            await Task.Run(() => { if (item.IsDirectory) Directory.Move(item.FullPath, target); else File.Move(item.FullPath, target); });
+            if (_tags.Remove(Path.GetFullPath(item.FullPath), out var tag)) { _tags[Path.GetFullPath(target)] = tag; SaveTags(); }
+            SaveIconPositions(item.Name, newName); item.IsRenaming = false; _renamePopup?.SetCurrentValue(System.Windows.Controls.Primitives.Popup.IsOpenProperty, false);
+            _renamePopup = null; _renameEditor = null; _renamingItem = null; StatusText.Text = $"已重命名为 {newName}"; await NavigateAsync(CurrentPath, false);
+        } catch (Exception error) { StatusText.Text = $"无法重命名：{error.Message}"; _renameEditor?.Focus(); }
+        finally { _finishingRename = false; }
+    }
     private async void Trash_Click(object sender, System.Windows.RoutedEventArgs e) { foreach (FileItem item in ActiveItems.ToArray()) { try { if (item.IsDirectory) FileSystem.DeleteDirectory(item.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin); else FileSystem.DeleteFile(item.FullPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin); } catch (OperationCanceledException) { } } await NavigateAsync(CurrentPath, false); }
     private void Copy_Click(object sender, System.Windows.RoutedEventArgs e) { _clipboardPaths.Clear(); _clipboardPaths.AddRange(ActiveItems.Select(item => item.FullPath)); _clipboardIsCut = false; StatusText.Text = $"已复制 {_clipboardPaths.Count} 个项目"; }
     private void Cut_Click(object sender, System.Windows.RoutedEventArgs e) { _clipboardPaths.Clear(); _clipboardPaths.AddRange(ActiveItems.Select(item => item.FullPath)); _clipboardIsCut = true; StatusText.Text = $"已剪切 {_clipboardPaths.Count} 个项目"; }

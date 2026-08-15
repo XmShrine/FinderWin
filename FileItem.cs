@@ -18,6 +18,8 @@ public sealed class FileItem(
     private double _canvasY;
     private string? _tagName;
     private string? _tagColor;
+    private string _renameText = name;
+    private bool _isRenaming;
 
     public string Name { get; } = name;
     public string FullPath { get; } = fullPath;
@@ -38,6 +40,8 @@ public sealed class FileItem(
     public string? TagName { get => _tagName; set { if (_tagName == value) return; _tagName = value; Notify(); Notify(nameof(HasTag)); } }
     public string? TagColor { get => _tagColor; set { if (_tagColor == value) return; _tagColor = value; Notify(); Notify(nameof(HasTag)); } }
     public bool HasTag => !string.IsNullOrWhiteSpace(TagName) && !string.IsNullOrWhiteSpace(TagColor);
+    public string RenameText { get => _renameText; set { if (_renameText == value) return; _renameText = value; Notify(); } }
+    public bool IsRenaming { get => _isRenaming; set { if (_isRenaming == value) return; _isRenaming = value; Notify(); } }
     public string SizeText => IsDirectory ? "--" : Size < 1024 ? $"{Size} B" : Size < 1024 * 1024 ? $"{Size / 1024d:F1} KB" : $"{Size / 1024d / 1024d:F1} MB";
     public bool IsMacMetadata => Name is ".DS_Store" or "__MACOSX";
 
