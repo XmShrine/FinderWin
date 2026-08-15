@@ -41,8 +41,10 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
     private bool _canvasDragging;
     private readonly List<string> _clipboardPaths = [];
     private FileItem? _renamingItem;
-    private System.Windows.Controls.Primitives.Popup? _renamePopup;
     private System.Windows.Controls.TextBox? _renameEditor;
+    private System.Windows.Controls.StackPanel? _iconRenameHost;
+    private System.Windows.Controls.TextBlock? _iconRenameOriginalText;
+    private System.Windows.Controls.Border? _iconRenameBadge;
     private bool _finishingRename;
     private readonly Dictionary<string, TagRecord> _tags;
     private static readonly (string Name, string Color)[] TagPalette = [("红色", "#FF5B57"), ("橙色", "#FF9F0A"), ("黄色", "#FFD60A"), ("绿色", "#30D158"), ("蓝色", "#0A84FF"), ("紫色", "#BF5AF2"), ("灰色", "#8E8E93")];
@@ -419,12 +421,24 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
         }, DispatcherPriority.Input);
     }
     private System.Windows.Controls.TextBox CreateIconRenameEditor(System.Windows.Controls.ListBoxItem container, FileItem item) {
-        var width = Math.Clamp(item.Name.Length * 8d + 14, 72, 150);
+        var original = FindIconNameText(container, item) ?? throw new InvalidOperationException("找不到图标名称控件");
+        var host = System.Windows.Media.VisualTreeHelper.GetParent(original) as System.Windows.Controls.StackPanel ?? throw new InvalidOperationException("图标名称容器无效");
+        var width = item.HasTag ? 86d : 104d;
         var editor = new System.Windows.Controls.TextBox { Style = (Style)FindResource("InlineRenameEditor"), DataContext = item, Text = item.RenameText, Width = width, Height = 24, FontSize = 12, TextAlignment = TextAlignment.Center, Visibility = Visibility.Visible };
         editor.TextChanged += (_, _) => item.RenameText = editor.Text;
         editor.KeyDown += RenameEditor_KeyDown; editor.LostKeyboardFocus += RenameEditor_LostKeyboardFocus;
-        _renamePopup = new System.Windows.Controls.Primitives.Popup { PlacementTarget = container, Placement = System.Windows.Controls.Primitives.PlacementMode.Relative, HorizontalOffset = (container.ActualWidth - width) / 2, VerticalOffset = 105, StaysOpen = true, AllowsTransparency = true, Child = editor, IsOpen = true };
+        original.Visibility = Visibility.Collapsed; host.Children.Add(editor); _iconRenameHost = host; _iconRenameOriginalText = original;
+        _iconRenameBadge = System.Windows.Media.VisualTreeHelper.GetParent(host) as System.Windows.Controls.Border;
+        _iconRenameBadge?.SetCurrentValue(System.Windows.Controls.Border.BackgroundProperty, System.Windows.Media.Brushes.Transparent);
         return editor;
+    }
+    private static System.Windows.Controls.TextBlock? FindIconNameText(DependencyObject parent, FileItem item) {
+        for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); index++) {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, index);
+            if (child is System.Windows.Controls.TextBlock text && ReferenceEquals(text.DataContext, item) && text.Text == item.Name) return text;
+            var nested = FindIconNameText(child, item); if (nested is not null) return nested;
+        }
+        return null;
     }
     private static T? FindVisualChild<T>(DependencyObject parent, string name) where T : FrameworkElement {
         for (var index = 0; index < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); index++) {
@@ -447,7 +461,13 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
     }
     private void CancelRename() {
         if (_renamingItem is not null) { _renamingItem.RenameText = _renamingItem.Name; _renamingItem.IsRenaming = false; }
-        _renamePopup?.SetCurrentValue(System.Windows.Controls.Primitives.Popup.IsOpenProperty, false); _renamePopup = null; _renameEditor = null; _renamingItem = null;
+        RestoreIconRenameVisual(); _renameEditor = null; _renamingItem = null;
+    }
+    private void RestoreIconRenameVisual() {
+        if (_iconRenameHost is not null && _renameEditor is not null && _iconRenameHost.Children.Contains(_renameEditor)) _iconRenameHost.Children.Remove(_renameEditor);
+        if (_iconRenameOriginalText is not null) _iconRenameOriginalText.Visibility = Visibility.Visible;
+        _iconRenameBadge?.ClearValue(System.Windows.Controls.Border.BackgroundProperty);
+        _iconRenameHost = null; _iconRenameOriginalText = null; _iconRenameBadge = null;
     }
     private async Task CommitRenameAsync() {
         if (_renamingItem is not FileItem item || _finishingRename) return;
@@ -460,8 +480,8 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
         try {
             await Task.Run(() => { if (item.IsDirectory) Directory.Move(item.FullPath, target); else File.Move(item.FullPath, target); });
             if (_tags.Remove(Path.GetFullPath(item.FullPath), out var tag)) { _tags[Path.GetFullPath(target)] = tag; SaveTags(); }
-            SaveIconPositions(item.Name, newName); item.IsRenaming = false; _renamePopup?.SetCurrentValue(System.Windows.Controls.Primitives.Popup.IsOpenProperty, false);
-            _renamePopup = null; _renameEditor = null; _renamingItem = null; StatusText.Text = $"已重命名为 {newName}"; await NavigateAsync(CurrentPath, false);
+            SaveIconPositions(item.Name, newName); item.IsRenaming = false; RestoreIconRenameVisual();
+            _renameEditor = null; _renamingItem = null; StatusText.Text = $"已重命名为 {newName}"; await NavigateAsync(CurrentPath, false);
         } catch (Exception error) { StatusText.Text = $"无法重命名：{error.Message}"; _renameEditor?.Focus(); }
         finally { _finishingRename = false; }
     }
