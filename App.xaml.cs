@@ -36,8 +36,8 @@ public partial class App : System.Windows.Application {
         var isDark = false;
         try { isDark = Convert.ToInt32(Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1)) == 0; } catch { }
         var colors = isDark
-            ? new[] { ("WindowBrush", "#1C1C1E"), ("ToolbarBrush", "#20201F"), ("SidebarBrush", "#1B1B1A"), ("ContentBrush", "#1E1E1D"), ("StrokeBrush", "#3A3A38"), ("TextBrush", "#F1F1F3"), ("SecondaryTextBrush", "#A0A0A4"), ("HoverBrush", "#30302F"), ("HeaderBrush", "#222221"), ("SidebarOutlineBrush", "#484846"), ("ScrollTrackBrush", "#72080808"), ("ScrollThumbBrush", "#A58A8A8E") }
-            : new[] { ("WindowBrush", "#F7F7F8"), ("ToolbarBrush", "#F5F5F6"), ("SidebarBrush", "#ECECEE"), ("ContentBrush", "#FCFCFD"), ("StrokeBrush", "#D2D2D4"), ("TextBrush", "#1C1C1E"), ("SecondaryTextBrush", "#7C7C80"), ("HoverBrush", "#E3E3E6"), ("HeaderBrush", "#F7F7F8"), ("SidebarOutlineBrush", "#00000000"), ("ScrollTrackBrush", "#16000000"), ("ScrollThumbBrush", "#8A7A7A7E") };
+            ? new[] { ("WindowBrush", "#1C1C1E"), ("ToolbarBrush", "#20201F"), ("SidebarBrush", "#1B1B1A"), ("ContentBrush", "#1E1E1D"), ("StrokeBrush", "#3A3A38"), ("TextBrush", "#F1F1F3"), ("SecondaryTextBrush", "#A0A0A4"), ("HoverBrush", "#30302F"), ("HeaderBrush", "#222221"), ("SidebarOutlineBrush", "#484846"), ("ScrollTrackBrush", "#26000000"), ("ScrollThumbBrush", "#A58A8A8E") }
+            : new[] { ("WindowBrush", "#F7F7F8"), ("ToolbarBrush", "#F5F5F6"), ("SidebarBrush", "#ECECEE"), ("ContentBrush", "#FCFCFD"), ("StrokeBrush", "#D2D2D4"), ("TextBrush", "#1C1C1E"), ("SecondaryTextBrush", "#7C7C80"), ("HoverBrush", "#E3E3E6"), ("HeaderBrush", "#F7F7F8"), ("SidebarOutlineBrush", "#00000000"), ("ScrollTrackBrush", "#0D000000"), ("ScrollThumbBrush", "#887A7A7E") };
         foreach (var (key, color) in colors) Resources[key] = new SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
     }
 }

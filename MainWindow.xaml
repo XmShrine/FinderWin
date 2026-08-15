@@ -17,7 +17,7 @@
     <Style TargetType="Separator"><Setter Property="Margin" Value="10,5"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Separator"><Border Height="1" Background="{DynamicResource StrokeBrush}"/></ControlTemplate></Setter.Value></Setter></Style>
     <Style x:Key="IconItem" TargetType="ListBoxItem"><Setter Property="Padding" Value="0"/><Setter Property="Background" Value="Transparent"/><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ListBoxItem"><ContentPresenter/></ControlTemplate></Setter.Value></Setter></Style>
   </Window.Resources>
-  <Border Background="{DynamicResource WindowBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="16" ClipToBounds="True">
+  <Border x:Name="WindowShell" Background="{DynamicResource WindowBrush}" BorderBrush="{DynamicResource StrokeBrush}" BorderThickness="1" CornerRadius="16" ClipToBounds="True">
     <Grid>
       <Grid.RowDefinitions><RowDefinition Height="72"/><RowDefinition Height="*"/><RowDefinition Height="25"/></Grid.RowDefinitions>
       <Border Grid.Row="0" Background="{DynamicResource ToolbarBrush}" CornerRadius="15,15,0,0">

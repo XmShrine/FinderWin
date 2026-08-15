@@ -61,7 +61,7 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
         _layoutSaveTimer.Tick += (_, _) => { _layoutSaveTimer.Stop(); SaveIconPositions(); };
         Loaded += async (_, _) => await NavigateAsync(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
         Closed += (_, _) => { _layoutSaveTimer.Stop(); SaveIconPositions(); _loadCancellation?.Cancel(); var h = new WindowInteropHelper(this).Handle; if (h != 0) UnregisterHotKey(h, HotKeyId); };
-        SizeChanged += (_, _) => ApplyNativeRoundedRegion();
+        SizeChanged += (_, _) => { ApplyNativeRoundedRegion(); ApplyWindowClip(); };
     }
 
     private void Window_SourceInitialized(object? sender, EventArgs e) {
@@ -75,6 +75,11 @@ public partial class MainWindow : System.Windows.Window, INotifyPropertyChanged 
         if (handle == 0 || !GetWindowRect(handle, out var rect)) return;
         var region = CreateRoundRectRgn(0, 0, rect.Right - rect.Left + 1, rect.Bottom - rect.Top + 1, 32, 32);
         if (region != 0) SetWindowRgn(handle, region, true); // Windows owns the region after this call.
+    }
+    private void ApplyWindowClip() {
+        if (WindowShell.ActualWidth <= 0 || WindowShell.ActualHeight <= 0) return;
+        WindowShell.Clip = new System.Windows.Media.RectangleGeometry(
+            new Rect(0, 0, WindowShell.ActualWidth, WindowShell.ActualHeight), 16, 16);
     }
     private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled) {
         if (msg == WmHotKey && wParam.ToInt32() == HotKeyId) { ToggleHidden(); handled = true; } return 0;

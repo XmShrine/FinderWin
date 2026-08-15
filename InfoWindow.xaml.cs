@@ -10,7 +10,8 @@ public partial class InfoWindow : Window {
         Item = item;
         InitializeComponent();
         DataContext = this;
-        Loaded += (_, _) => ApplyIconState();
+        Loaded += (_, _) => { ApplyIconState(); ApplyWindowClip(); };
+        SizeChanged += (_, _) => ApplyWindowClip();
     }
 
     public string ItemName => Item.Name;
@@ -32,6 +33,12 @@ public partial class InfoWindow : Window {
             GenericPreview.Visibility = Visibility.Visible;
             LargeGenericPreview.Visibility = Visibility.Visible;
         }
+    }
+
+    private void ApplyWindowClip() {
+        if (WindowShell.ActualWidth <= 0 || WindowShell.ActualHeight <= 0) return;
+        WindowShell.Clip = new System.Windows.Media.RectangleGeometry(
+            new Rect(0, 0, WindowShell.ActualWidth, WindowShell.ActualHeight), 16, 16);
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
